@@ -1,0 +1,186 @@
+---
+title: "ML Data Cleansing"
+author: "最可爱的小栗子"
+date: "2020/2/2"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+geometry: margin=0.75in
+fontsize: 12pt
+fig_crop: no
+---
+
+```{r setup, include=FALSE}
+library(gridExtra)
+library(tidyverse)
+library(mosaic)
+library(broom)
+library(modelr)
+library(car)
+library(knitr)
+library(GGally)
+library(dummies)
+library(MASS)
+library(foreign)
+library(ISLR)
+library(rsample)
+library(rcfss)
+library(yardstick)
+library(ggplot2)
+library(dplyr)
+options(width=70, digits=4, scipen=8)
+knitr::opts_chunk$set(size='small') # Set the default R output size a bit smaller
+```
+
+#Import Dataset
+```{r}
+defaultDataDir = "/Users/Liz/Desktop/ML-Project/data/2019"
+fileName = "asec_csv_repwgt_2019.csv"
+fileLocation = file.path(defaultDataDir, fileName)
+asec = read.csv(file = fileLocation, header = T, na.strings = "?")
+fileName1 = "ffpub19.csv"
+fileLocation1 = file.path(defaultDataDir, fileName1)
+ff =  read.csv(file = fileLocation1, header = T, na.strings = "?")
+fileName2 = "hhpub19.csv"
+fileLocation2 = file.path(defaultDataDir, fileName2)
+hh = read.csv(file = fileLocation2, header = T, na.strings = "?")
+fileName3 = "pppub19.csv"
+fileLocation3 = file.path(defaultDataDir, fileName3)
+pp = read.csv(file = fileLocation3, header = T, na.strings = "?")
+```
+
+#Household Data
+```{r}
+#Region {1 = Northeast, 2 = Midwest, 3 = South, 4 = West}
+selected_nzes2011 %>% 
+  group_by(jpartyvote) %>% 
+  summarise(count = n())
+#The South has the largest proportion
+
+#State (1:56)
+hh %>% group_by(GESTFIPS) %>% summarise(count = n())
+
+#Income (-1 means not in Universe)
+#Filter all the -1
+income <- hh %>% filter(HEFAMINC != -1)
+ggplot(data = income, aes(x = HEFAMINC)) + geom_histogram(binwidth = 1)
+
+#H_tenured (1 = owned or being bought, 2 = rented, 3 = no cash rent)
+income <- income %>% filter(H_TENURE != -1)
+income %>% group_by(H_TENURE) %>% summarise(count = n())
+income %>% dplyr::select(HEFAMINC, H_TENURE) %>% table()
+```
+
+#Family Data
+```{r}
+#FKIND (1 = married couple, 2 = male reference, 3 = female reference)
+ff %>% group_by(FKIND) %>% summarise(count = n())
+
+#FOWNU18 (Number of own never married children under 18) (0~9)
+
+#FPERSONS (Number of persons in family)
+summary(ff$FPERSONS)
+ff %>% group_by(FTYPE) %>% summarise(count = n())
+income_ff <- ff %>% filter((FTYPE == 1) | (FTYPE == 3)) #1 is primary family, 3 is related subfamily
+
+#FTOT_R (Total family income recode)
+ggplot(data = income_ff, aes(x = FTOT_R)) + geom_histogram(binwidth = 1)
+summary(income_ff$FTOT_R)
+
+#FTOTVAL (negative value)
+```
+
+#Person Data
+```{r}
+#A_AGE, AGE1
+summary(pp$A_AGE)
+
+#Education Attainment
+
+#A_MARITL
+
+#A_SEX
+
+#HHDREL??? (Deailed household summary)
+
+#P_STAT (status of person idenitifier)
+
+#PEAFEVER (Did you ever serve on active duty in the U.S. Armed Forces?)
+
+#Disability Variables: PEDISDRS, PEDISEAR, PEDISEYE, PEDISOUT, PEDISPHY, PEDISREM
+
+#PEFNTVTY(In what country was your father born?)
+
+#PEHSPNON (Are you Spanish, Hispanic or Latino?)
+
+#PEINUSYR (When did you come to the U.S. to stay?)
+
+#PEMNTVTY (in what country was your mother born?) 
+
+#PENATVTY(in what country were you born?)
+
+#PRCITSHP(citizenship group)
+
+#PRDASOAM (detailed Asian subgroup)
+
+#PRDTHSP(Detailed Hispanic recode)
+
+#PRDTRACE(Race)
+
+#PRPERTYP(Type of person record recode) 1 = child household member, 2 = adult civilian household member, 3 = adult armed forces household member
+
+#A_HRS1(How many hrs did ... work last week at all jobs?) -1 = Not in universe, 00 = Children and Armed Forces, 01-99 = Number of hrs
+
+#A_MJIND(Major industry code) 
+
+#A_MJOCC(Major occupation code)
+
+#PEIO1COW (Individual class of worker on first job)
+
+#PRUNTYPE (Reason for unemployment)
+
+#A_GRSWK (How much does...usually earn per week at this job before deductions, subject to top coding...)
+
+#A_HERNTF (Current earnings - hourly pay topcoded flag?????)
+
+#A_HRSPAY (How much does ... earn per hour?)
+
+#A_CIVLF (0 = Not in universe or children and Armed Forces)
+
+#A_CLSWKR (Class of worker)
+
+#A_EXPLF(Experienced Labor Force Employment Status)
+
+#A_FTLF(Full/time labor force)
+
+#A_LFSR(labor force status recode)
+
+#A_UNTYPE (reason for unemployment)
+
+#PRWKSTAT(Full/Part-time work status)
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
