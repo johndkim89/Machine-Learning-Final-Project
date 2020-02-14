@@ -166,9 +166,30 @@ summary(pp$A_AGE)
 ```
 
 
+```{r Preliminary Tree}
+attach()
+data.frame()
+
+set.seed(111)
+train <- sample(1:nrow("data"), "n")
+test.income <- "data"[-train]
+tree.income <- tree("income" ~. , "data", subset = train)
+tree.pred <- predict(tree.income, test.income, type = "class")
+
+# We use cv.tree() to check if pruning the tree will improve the prediction.
+cv.income <- cv.tree(tree.income) 
+plot(cv.income$
+
+# Bagging and Random Forests
+library(randomForest)
+set.seed(222)
+bag.income <- randomForest("income"~., data = "", subset = train, mtry = , importance = TRUE)
+bag.income
+
+obs.bag <- randomForest("income" ~., data = "". subset = train, mtry = , ntree = 1000)
 
 
-
+```
 
 
 
