@@ -162,6 +162,11 @@ summary(pp$A_AGE)
 
 
 
+#PRDLSSELG (Does this person have any disabilities?)
+
+#PEMLR (Major labor force recode) – **Not using this variable
+
+#AXAGE (Age) – Maybe not, but we can use this to compare individuals within the same age group
 
 ```
 
