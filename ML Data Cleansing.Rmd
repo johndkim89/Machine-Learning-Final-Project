@@ -172,14 +172,42 @@ summary(pp$A_AGE)
 
 
 ```{r Preliminary Tree}
-attach()
-data.frame()
+income_df <- read.csv(file.choose())
+data.frame(income_df)
+as.factor(income_df$A_SEX)
+as.factor(income_df$HHINC)
+as.factor(income_df$PRCITSHP)
+as.factor(income_df$PRDTHSP)
+as.factor(income_df$PRDTRACE)
+as.factor(income_df$PENATVTY)
+as.factor(income_df$PEFNTVTY)
+as.factor(income_df$PEMNTVTY)
+as.factor(income_df$PEPAR1TYP)
+as.factor(income_df$PEPAR2TYP)
+as.factor(income_df$H_TENURE)
+as.factor(income_df$A_MARITL)
+as.factor(income_df$P_STAT)
+as.factor(income_df$PEAFEVER)
+as.factor(income_df$PEHSPNON)
+as.factor(income_df$PEINUSYR)
+as.factor(income_df$PRDASIAN)
+as.factor(income_df$PRDTHSP)
+as.factor(income_df$A_MJIND)
+as.factor(income_df$A_MJOCC)
+as.factor(income_df$A_HRS1)
+as.factor(income_df$A_GRSWK)
+as.factor(income_df$PEDISDRS)
+as.factor(income_df$PEDISEAR)
+as.factor(income_df$PEDISOUT)
+as.factor(income_df$PEDISPHY)
 
+library(tree)
 set.seed(111)
-train <- sample(1:nrow("data"), "n")
-test.income <- "data"[-train]
-tree.income <- tree("income" ~. , "data", subset = train)
-tree.pred <- predict(tree.income, test.income, type = "class")
+train.income <- sample(1:nrow(income_df), 3759)
+test.income <- income_df[-train.income]
+tree.income <- tree(HTOTVAL ~.-HHINC , income_df, subset = train.income)
+plot(tree.income); text(tree.income, pretty = 0)
+tree.pred <- predict(tree.income, newdata = test.income, type = "tree")
 
 # We use cv.tree() to check if pruning the tree will improve the prediction.
 cv.income <- cv.tree(tree.income) 
@@ -188,11 +216,9 @@ plot(cv.income$
 # Bagging and Random Forests
 library(randomForest)
 set.seed(222)
-bag.income <- randomForest("income"~., data = "", subset = train, mtry = , importance = TRUE)
+bag.income <- randomForest(HTOTVAL~., data = income_df , subset = train.income, importance = TRUE)
 bag.income
-
-obs.bag <- randomForest("income" ~., data = "". subset = train, mtry = , ntree = 1000)
-
+obs.bag <- randomForest(HTOTVAL ~., data = income_df. subset = train.income, ntree = 1000)
 
 ```
 
