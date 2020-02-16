@@ -1,0 +1,155 @@
+---
+title: "ML Data Cleaning 2.0"
+author: "Liz"
+date: "2020/2/15"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+geometry: margin=0.75in
+fontsize: 12pt
+fig_crop: no
+---
+
+```{r setup, include=FALSE}
+library(gridExtra)
+library(tidyverse)
+library(mosaic)
+library(broom)
+library(modelr)
+library(car)
+library(knitr)
+library(GGally)
+library(dummies)
+library(MASS)
+library(foreign)
+library(ISLR)
+library(rsample)
+library(rcfss)
+library(yardstick)
+library(ggplot2)
+library(dplyr)
+options(width=70, digits=4, scipen=8)
+knitr::opts_chunk$set(size='small')
+```
+
+#Import Dataset
+```{r}
+defaultDataDir = "/Users/Liz/Desktop/ML-Project/data/2019"
+fileName2 = "hhpub19.csv"
+fileLocation2 = file.path(defaultDataDir, fileName2)
+hh = read.csv(file = fileLocation2, header = T, na.strings = "?")
+fileName3 = "pppub19.csv"
+fileLocation3 = file.path(defaultDataDir, fileName3)
+pp = read.csv(file = fileLocation3, header = T, na.strings = "?")
+
+
+# Household data
+#df_hh <- read.csv(file.choose(), header=TRUE)
+# Family data
+#df_fa <- read.csv(file.choose(), header=TRUE)
+# Person data
+#df_per <- read.csv(file.choose(), header=TRUE)
+
+```
+
+
+# Matching hh and pp
+Household ID: H_SEQ
+Matching key in Personal Data: PH_SEQ
+
+```{r}
+# matching key between person data and household
+numperson_hh <- pp %>% group_by(PH_SEQ) %>% summarise(n=n()) #PH_SEQ is the sequence number of family record in household
+match_hh_per <- numperson_hh$PH_SEQ # household id we can use personal data as well
+```
+
+```{r}
+per_ho <- 
+  pp %>%
+  filter(HHDREL==1) #Now we have all the householders info in this list
+new_pp <- 
+  hh %>%
+  filter(H_SEQ %in% match_hh_per) %>%
+  inner_join(per_ho, by=c("H_SEQ" = "PH_SEQ")) #New dataset
+
+```
+
+
+#All the variable
+```{r} 
+#A_SEX: 1 = Male, 2 = Female
+#A_AGE
+#PRCITSHP: 1 = Native, born in US; 2 = Native, born in PR or US outlying area; 3 = Native, born abroad of US parent(s); 4 = Foreign born, US cit by naturalization; 5 = Foreign born, not a US citizen
+#PRDTRACE: 1 = White only, 2 = Black only, 3 = AI only, 4 = Asian only, 5 = HP only, 6 = Mixture (Clean)
+#PENATVTY: Place of Birth 1 = U.S., 2 = Outside of U.S. (C)
+#PEFNTVTY: Father's Place of Birth 1 = U.S., 2 = Outside of U.S. (C)
+#PEMNTVTY: Mother's Place of Birth 1 = U.S., 2 = Outside of U.S. (C)
+#PEPAR1TYP (DAD): -1 = Dead, 1 = Biological, 2 = Step, 3 = Adopted
+#PEPAR2TYP (MOM): -1 = Dead, 1 = Biological, 2 = Step, 3 = Adopted
+#H_TENURE 
+#A_MARITL (1, 2, 3 into Married)
+#P_STAT
+#PEAFEVER
+#PEHSPNON
+#PEINUSYR
+#PRDASIAN
+#PRDTHSP
+#A_MJIND
+#A_MJOCC
+#A_HRS1 (Questionable about this)
+#A_GRSWK （0000 去掉）
+#A_CLSWKR
+
+##All the Disability Variables
+#PEDISDRS
+#PEDISEAR
+#PEDISOUT
+#PEDISPHY
+#PEDISREM
+
+```
+
+#Select all the Variables we need
+```{r}
+new_pp <- dplyr::select (new_pp, A_SEX, A_AGE, PRCITSHP, PRDTRACE, PENATVTY, PEFNTVTY, PEMNTVTY, PEPAR1TYP, PEPAR2TYP, H_TENURE, A_MARITL, P_STAT, PEAFEVER, PEHSPNON, PEINUSYR, PRDASIAN, PRDTHSP, A_MJIND, A_MJOCC, A_HRS1, A_GRSWK, A_CLSWKR, PEDISDRS, PEDISEAR, PEDISOUT, PEDISPHY, PEDISREM )
+```
+
+#Data Cleaning
+```{r}
+#A_GRSWK (Remove 0000）
+new_pp1 <- subset(new_pp, !(A_GRSWK==0000))
+
+#PRDTRACE: 1 = White only, 2 = Black only, 3 = Asian only, 4 = AI only, 5 = HP only, 6 = Mixture (Clean)
+for (i in 1:length(new_pp1$PRDTRACE)) {
+    if(!(new_pp1$PRDTRACE[i] == 1 | new_pp1$PRDTRACE[i] == 2 |
+         new_pp1$PRDTRACE[i] == 3 | new_pp1$PRDTRACE[i] == 4
+         |new_pp1$PRDTRACE[i] == 5)){
+      new_pp1$PRDTRACE[i] = 6
+    }
+}
+
+#PENATVTY: Place of Birth 1 = U.S., 2 = Outside of U.S.
+new_pp1 <- new_pp1 %>% filter(PENATVTY == 57)
+
+##PEFNTVTY: Father's Place of Birth 1 = U.S., 2 = Outside of U.S.
+new_pp1 <- new_pp1 %>% filter(PEFNTVTY == 57)
+
+#PEMNTVTY: Mother's Place of Birth 1 = U.S., 2 = Outside of U.S.
+new_pp1 <- new_pp1 %>% filter(PEMNTVTY == 57)
+
+#A_MARITL (1, 2, 3 into Married)
+for (i in 1:length(new_pp1$A_MARITL)) {
+    if(new_pp1$A_MARITL[i] == 1 | new_pp1$A_MARITL[i] == 2 |
+         new_pp1$A_MARITL[i] == 3){
+      new_pp1$A_MARITL[i] = 1
+    }
+}
+
+write.csv(new_pp1, "MLData_Clean.csv")
+
+
+```
+
+
+
