@@ -1,0 +1,167 @@
+---
+title: "ML_State_Tree"
+author: "Xin Feng"
+date: "2020/2/25"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+geometry: margin=0.75in
+fontsize: 12pt
+fig_crop: no
+---
+
+
+```{r setup, include=FALSE}
+library(gridExtra)
+library(tidyverse)
+library(mosaic)
+library(broom)
+library(modelr)
+library(car)
+library(knitr)
+library(GGally)
+library(dummies)
+library(MASS)
+library(foreign)
+library(ISLR)
+library(rsample)
+library(rcfss)
+library(yardstick)
+library(tree)
+library(e1071)
+library(class) # for kNN
+library(arm) # for a few base features
+library(partykit)
+library(reldist) # gini coefficient
+options(width=70, digits=4, scipen=8)
+knitr::opts_chunk$set(size='small') # Set the default R output size a bit smaller
+```
+
+
+##Loading Data
+```{r}
+df1 <- read.csv("MLData_Clean.csv")
+```
+
+##Variables: 
+#HTOTVAL: household income
+#A_SEX: 1 = Male, 2 = Female
+#A_AGE
+#PRCITSHP: 1 = Native, born in US; 2 = Native, born in PR or US outlying area; 3 = Native, born abroad of US parent(s); 4 = Foreign born, US cit by naturalization; 5 = Foreign born, not a US citizen
+#PRDTRACE: 1 = White only, 2 = Black only, 3 = AI only, 4 = Asian only, 5 = HP only, 6 = Mixture (Clean)
+#PEHSPNON: Are you Spanish, Hispanic, or Latino?  1 = Yes 2 = No
+#PENATVTY: Place of Birth 1 = U.S., 2 = Outside of U.S. (Clean)
+#PEFNTVTY: Father's Place of Birth 1 = U.S., 2 = Outside of U.S. (Clean)
+#PEMNTVTY: Mother's Place of Birth 1 = U.S., 2 = Outside of U.S. (Clean)
+#PEPAR1TYP (DAD): -1 = Dead, 1 = Biological, 2 = Step, 3 = Adopted
+#PEPAR2TYP (MOM): -1 = Dead, 1 = Biological, 2 = Step, 3 = Adopted
+#P_STAT Values: 1 = Civilian 15+, 2 = Armed Forces
+#A_MJOCC: Major Occupation Code 0-11
+#A_MJIND: Major Industry Code 0-14
+
+#Variables and Factor
+```{r}
+# merged data
+df1s <- select(df1, "HTOTVAL","A_SEX","PRCITSHP","PRDTRACE","PENATVTY","PEFNTVTY","PEMNTVTY","PEPAR1TYP","PEPAR2TYP","P_STAT", "A_MJOCC", "A_MJIND", "GESTFIPS", "state", "state_full")
+# converting interger to factors
+df1s[sapply(df1s, is.integer)] <- lapply(df1s[sapply(df1s, is.integer)], as.factor)
+df1s[,1] <- as.integer(df1s[,1])/1000
+head(df1s)
+```
+
+##PART I: 
+##Filter the dataset by state 1-56
+##Within each state, further divide the data into training/testing set
+##Then, run a ctree on training set and then a ctree on the testing set
+##We use the tree result to generate MSE and gini coefficient
+
+
+##Separate the states, recreate a list consistes of 51 states. (5 states do not have data)
+```{r}
+state_length <- 56
+state_list <- vector(mode = "list", length = state_length)
+for (i in 1:state_length) {
+    state_list[[i]] <- df1s %>% filter(GESTFIPS == i)
+}
+
+#5 states we don't have any record, remove them
+state_list[[3]] <- NULL
+state_list[[6]] <- NULL
+state_list[[12]] <- NULL
+state_list[[40]] <- NULL
+state_list[[48]] <- NULL
+```
+
+
+##Training and Testing Set List
+```{r}
+train_length <- 51
+test_length <- 51
+train_list <- vector(mode = "list", length = 51)
+test_list <- vector(mode = "list", length = 51)
+
+set.seed(100)
+for (i in 1:train_length) {
+  num = seq(from=1, to=nrow(state_list[[i]]), by=1) 
+  train_list[[i]]=sample(1:nrow(state_list[[i]]),
+                           nrow(state_list[[i]])*0.75)
+}
+
+for (j in 1:test_length) {
+    k = 1
+    test_list[[j]] = rep("NA", times = nrow(state_list[[j]])*0.25)
+    num = seq(from=1, to=nrow(state_list[[j]]), by=1) 
+    for (m in 1:length(num)) {
+       if(is.element(num[m], train_list[[j]]) == FALSE){
+         test_list[[j]][k] = num[m]
+         k = k + 1
+       }
+    }
+    test_list[[j]] = as.integer(test_list[[j]])
+    test_list[[j]] = sample(test_list[[j]])
+}
+
+```
+
+
+##Tree List
+```{r}
+tree_list <- vector(mode = "list", length = 51)
+
+for (i in 1:length(tree_list)) {
+ train <- train_list[[i]]
+ citree <- ctree(HTOTVAL ~ .,
+                data=state_list[[i]][train, ],
+                control = ctree_control(alpha=0.05,
+                                        testtype="Bonferroni"))
+ tree_list[[i]] <- citree
+}
+```
+
+
+##Graph
+```{r, fig.width=30, fig.height=20}
+# Plot
+#for (i in 1:2){
+plot(tree_list[[1]])
+#}
+```
+
+##MES and Opportunity based Gini coefficient of 51 states
+```{r}
+# mse
+mse <- seq(from=1, to=51, by=1)
+for (i in 1:51) {
+  test <- test_list[[i]]
+  mse[i] <- mean((state_list[[i]][test, ]$HTOTVAL - 
+  predict(tree_list[[i]],newdata = state_list[[i]][test, ]))^2)
+}
+
+# opportunity based gini coefficient
+gini_opp <- seq(from=1, to=51, by=1)
+for (i in 1:51) {
+  gini_opp[i] <- gini(predict(tree_list[[i]],newdata = state_list[[i]]))
+}
+
+```
