@@ -1,0 +1,178 @@
+---
+title: "ML Data Cleaning 2.0"
+author: "Liz"
+date: "2020/2/15"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+geometry: margin=0.75in
+fontsize: 12pt
+fig_crop: no
+---
+
+```{r setup, include=FALSE}
+library(gridExtra)
+library(tidyverse)
+library(mosaic)
+library(broom)
+library(modelr)
+library(car)
+library(knitr)
+library(GGally)
+library(dummies)
+library(MASS)
+library(foreign)
+library(ISLR)
+library(rsample)
+library(rcfss)
+library(yardstick)
+library(ggplot2)
+library(dplyr)
+options(width=70, digits=4, scipen=8)
+knitr::opts_chunk$set(size='small')
+```
+
+#Import Dataset
+```{r}
+defaultDataDir = "/Users/Liz/Desktop/ML-Project/data/2019"
+fileName2 = "hhpub19.csv"
+fileLocation2 = file.path(defaultDataDir, fileName2)
+hh = read.csv(file = fileLocation2, header = T, na.strings = "?")
+fileName3 = "pppub19.csv"
+fileLocation3 = file.path(defaultDataDir, fileName3)
+pp = read.csv(file = fileLocation3, header = T, na.strings = "?")
+fileName4 = "fipscodes.csv"
+fileLocation4 = file.path(defaultDataDir, fileName4)
+fips = read.csv(file = fileLocation4, header = T, na.strings = "?")
+
+# Household data
+#df_hh <- read.csv(file.choose(), header=TRUE)
+# Family data
+#df_fa <- read.csv(file.choose(), header=TRUE)
+# Person data
+#df_per <- read.csv(file.choose(), header=TRUE)
+
+```
+
+# Adding State names
+```{r}
+# matching state name and fips code
+hh <- left_join(hh,fips,by="GESTFIPS")
+head(hh$GESTFIPS)
+head(hh$state_full)
+```
+
+
+# Matching hh and pp
+Household ID: H_SEQ
+Matching key in Personal Data: PH_SEQ
+
+```{r}
+# matching key between person data and household
+numperson_hh <- pp %>% group_by(PH_SEQ) %>% summarise(n=n()) #PH_SEQ is the sequence number of family record in household
+match_hh_per <- numperson_hh$PH_SEQ # household id we can use personal data as well
+```
+
+```{r}
+per_ho <- 
+  pp %>%
+  filter(HHDREL==1) #Now we have all the householders info in this list
+new_pp <- 
+  hh %>%
+  filter(H_SEQ %in% match_hh_per) %>%
+  inner_join(per_ho, by=c("H_SEQ" = "PH_SEQ")) #New dataset
+
+```
+
+
+#All the variable
+```{r} 
+##Variables: 
+#HTOTVAL: household income
+#H_TENURE
+#A_SEX: 1 = Male, 2 = Female
+#A_AGE
+#PRCITSHP: 1 = Native, born in US; 2 = Native, born in PR or US outlying area / Native, born abroad of US parent(s) / Foreign born, US cit by naturalization; 3 = Foreign born, not a US citizen
+#PRDTRACE: 1 = White only; 2 = Black only; 3 = American Indian, Alaskan Native only (AI); 4 = Others
+#PEHSPNON: Are you Spanish, Hispanic, or Latino?  1 = Yes 2 = No
+#PENATVTY: Place of Birth 1 = U.S., 2 = Outside of U.S. 
+#PEFNTVTY: Father's Place of Birth 1 = U.S., 2 = Outside of U.S. 
+#PEMNTVTY: Mother's Place of Birth 1 = U.S., 2 = Outside of U.S. 
+#A_MJOCC: Major Occupation Code 0-11, Merge 6 and 11 to 0 
+#A_MJIND: Major Industry Code 0-14, merge 14 to 0, merge 7 to 12, merge 1 and 2
+#GESTFIPS
+#state
+#state_full
+```
+
+#Select all the Variables we need
+```{r}
+new_pp <- dplyr::select (new_pp, HTOTVAL, H_TENURE, A_SEX, A_AGE, PRCITSHP, PRDTRACE, PEHSPNON, PENATVTY, PEFNTVTY, PEMNTVTY, A_MJIND, A_MJOCC, GESTFIPS, state, state_full)
+```
+
+#Data Cleaning
+```{r}
+#There is no NA data in this dataset.
+
+#PRCITSHP
+for (i in 1:length(new_pp$PRCITSHP)) {
+    if (new_pp$PRCITSHP[i] == 3 | new_pp$PRCITSHP[i] == 4){
+      new_pp$PRCITSHP[i] = 2
+    } 
+    else if (new_pp$PRCITSHP[i] == 5){
+      new_pp$PRCITSHP[i] = 3
+    }
+}
+
+#PRDTRACE: 1 = White only, 2 = Black only, 3 = AI only, 5 = HP only, 6 = Mixture (Clean)
+for (i in 1:length(new_pp$PRDTRACE)) {
+    if(!(new_pp$PRDTRACE[i] == 1 | new_pp$PRDTRACE[i] == 2 |
+         new_pp$PRDTRACE[i] == 3)) {
+      new_pp$PRDTRACE[i] = 4
+    }
+}
+
+
+#PENATVTY: Place of Birth 1 = U.S., 2 = Outside of U.S.
+new_pp$PENATVTY <- ifelse(new_pp$PENATVTY == 57, 1, 2)
+
+##PEFNTVTY: Father's Place of Birth 1 = U.S., 2 = Outside of U.S.
+new_pp$PEFNTVTY <- ifelse(new_pp$PEFNTVTY == 57, 1, 2)
+
+#PEMNTVTY: Mother's Place of Birth 1 = U.S., 2 = Outside of U.S.
+new_pp$PEMNTVTY <- ifelse(new_pp$PEMNTVTY == 57, 1, 2)
+
+#A_MJOCC: Major Occupation Code 0-11, Merge 6 and 11 to 0 
+for (i in 1:length(new_pp$A_MJOCC)) {
+    if(new_pp$A_MJOCC[i] == 6 | new_pp$A_MJOCC[i] == 11){
+      new_pp$A_MJOCC[i] = 0
+    }
+}
+
+
+#A_MJIND: Major Industry Code 0-14, merge 14 to 0, merge 7 to 12, merge 1 and 2
+for (i in 1:length(new_pp$A_MJIND)) {
+    if(new_pp$A_MJIND[i] == 14){
+      new_pp$A_MJIND[i] = 0
+    }
+    else if(new_pp$A_MJIND[i] == 7){
+      new_pp$A_MJIND[i] = 12
+    }
+    else if(new_pp$A_MJIND[i] == 2){
+      new_pp$A_MJIND[i] = 1
+    }
+  
+}
+
+
+write.csv(new_pp, "MLData_Clean.csv")
+
+#new_pp %>% group_by(PRCITSHP) %>% summarise(count = n())
+#new_pp %>% group_by(PRDTRACE) %>% summarise(count = n())
+#new_pp %>% group_by(A_MJOCC) %>% summarise(count = n())
+#new_pp %>% group_by(A_MJIND) %>% summarise(count = n())
+```
+
+
+
