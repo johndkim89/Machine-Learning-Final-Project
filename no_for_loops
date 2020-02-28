@@ -1,0 +1,157 @@
+---
+title: "ML Final Project"
+author: "John Kim"
+date: '2020 2 15 '
+output: html_document
+---
+```{r setup, include=FALSE}
+library(gridExtra)
+library(tidyverse)
+library(mosaic)
+library(broom)
+library(modelr)
+library(car)
+library(knitr)
+library(GGally)
+library(dummies)
+library(MASS)
+library(foreign)
+library(ISLR)
+library(rsample)
+library(rcfss)
+library(yardstick)
+library(ggplot2)
+library(dplyr)
+options(width=70, digits=4, scipen=8)
+knitr::opts_chunk$set(size='small') # Set the default R output size a bit smaller
+```
+
+
+
+```{r Preliminary Tree}
+library(tree)
+library(randomForest)
+income_df <- read.csv(file.choose())
+A_AGE <- income_df$A_AGE
+HTOTVAL <- as.integer((income_df$HTOTVAL)/1000)
+income_df1 <- income_df[-c(1, 14:16)]
+income_df1 <- income_df1[-c(1, 4)]
+
+income_df1[sapply(income_df1, is.integer)] <- lapply(income_df1[sapply(income_df1, is.integer)], as.factor)
+income_df1 <- data.frame(income_df1, A_AGE)
+income_df1 <- data.frame(income_df1, HTOTVAL)
+
+
+income_df
+
+attach(income_df1)
+
+set.seed(1)
+age_1 <- subset(income_df1, A_AGE >= 15 & A_AGE < 25)
+age_2 <- subset(income_df1, A_AGE >= 25 & A_AGE < 35)
+age_3 <- subset(income_df1, A_AGE >= 35 & A_AGE < 45)
+age_4 <- subset(income_df1, A_AGE >= 45 & A_AGE < 55)
+age_5 <- subset(income_df1, A_AGE >= 55 & A_AGE < 65)
+age_6 <- subset(income_df1, A_AGE >= 65 & A_AGE < 75)
+age_7 <- subset(income_df1, A_AGE >= 75)
+
+
+train.age.1 <- sample(1:nrow(age_1), 2200)
+train.age.2 <- sample(1:nrow(age_2), 7500)
+train.age.3 <- sample(1:nrow(age_3), nrow(age_3)*0.75)
+train.age.4 <- sample(1:nrow(age_4), nrow(age_4)*0.75)
+train.age.5 <- sample(1:nrow(age_5), nrow(age_5)*0.75)
+train.age.6 <- sample(1:nrow(age_6), nrow(age_6)*0.75)
+train.age.7 <- sample(1:nrow(age_7), nrow(age_7)*0.75)
+
+test.age.1 <- setdiff(1:nrow(age_1), train.age.1)
+test.age.2 <- age_2[-train.age.2]
+test.age.3 <- age_3[-train.age.3]
+test.age.4 <- age_4[-train.age.4]
+test.age.5 <- age_5[-train.age.5]
+test.age.6 <- age_6[-train.age.6]
+test.age.7 <- age_7[-train.age.7]
+
+
+library(partykit)
+ctree.1 <- ctree(HTOTVAL~.-A_AGE, data=income_df1[train.age.1,], control=ctree_control(alpha=0.05,
+                                        testtype="Bonferroni"))
+ctree.2 <- ctree(HTOTVAL~.-A_AGE, data=income_df1[train.age.2,], control=ctree_control(alpha=0.05,
+                                        testtype="Bonferroni"))
+ctree.3 <- ctree(HTOTVAL~.-A_AGE, data=income_df1[train.age.3,], control=ctree_control(alpha=0.05,
+                                        testtype="Bonferroni"))
+ctree.4 <- ctree(HTOTVAL~.-A_AGE, data=income_df1[train.age.4,], control=ctree_control(alpha=0.05,
+                                        testtype="Bonferroni"))
+ctree.5 <- ctree(HTOTVAL~.-A_AGE, data=income_df1[train.age.5,], control=ctree_control(alpha=0.05,
+                                        testtype="Bonferroni"))
+ctree.6 <- ctree(HTOTVAL~.-A_AGE, data=income_df1[train.age.6,], control=ctree_control(alpha=0.05,
+                                        testtype="Bonferroni"))
+ctree.7 <- ctree(HTOTVAL~.-A_AGE, data=income_df1[train.age.7,], control=ctree_control(alpha=0.05,
+                                        testtype="Bonferroni"))
+
+pred.ctree.1 <- predict(ctree.1, test.age.1)
+
+
+plot(ctree.1)
+plot(ctree.2)
+plot(ctree.3)
+plot(ctree.4)
+plot(ctree.5)
+plot(ctree.6)
+plot(ctree.7)
+
+
+
+```
+
+```{r}
+
+library(tree)
+library(randomForest)
+library(gbm)
+
+set.seed(1)
+tree.age.1 <- tree(HTOTVAL ~. -A_AGE, data = income_df1[train.age.1,])
+tree.age.2 <- tree(HTOTVAL ~. -A_AGE, data = income_df1[train.age.2, ])
+tree.age.6 <- tree(HTOTVAL ~. -A_AGE, data =income_df1[train.age.6, ])
+
+
+pred.tree.1 <- predict(tree.age.1, data = income_df1[-train.age.1, ])
+mse.1 <- mean((pred.tree.1 - test.age.1)^2)
+mse.1
+
+plot(tree.age.1); text(tree.age.1, pretty = 0)
+plot(tree.age.2); text(tree.age.2, pretty = 0)
+plot(tree.age.6); text(tree.age.6, pretty = 0)
+
+
+
+#library(tree)
+#set.seed(111)
+#train.income <- sample(1:nrow(income_df), 3759)
+#prune.income <- prune.tree(HTOTVAL ~.-HHINC -X , income_df, subset = train.income)
+#summary(tree.income)
+#plot(tree.income); text(tree.income, pretty = 0)
+
+# We use cv.tree() to check if pruning the tree will improve the prediction.
+#cv.income <- cv.tree(tree.income) 
+#plot(cv.income$size, cv.income$dev, type = 'b')
+#prune.income <- prune.tree(tree.income, best = 5)
+#plot(prune.income); text(prune.income, pretty = 0)
+
+# We use the unprued tree to make predictions on the test set.
+
+#yhat <- predict(tree.income, newdata = test.income)
+#income.test <- income_df[-train.income, "HTOTVAL"]
+#plot(yhat, income.test); abline(0,1)
+#mean((yhat-income.test)^2)
+
+# Bagging and Random Forests 
+#library(randomForest)
+#set.seed(222)
+#bag.income1 <- randomForest(HTOTVAL~.-A_AGE, data = income_df1, subset = train.income.1,
+#                           mtry = 27, importance = TRUE)
+#bag.income
+#obs.bag <- randomForest("income" ~., data = "". subset = train, mtry = , ntree = 1000)
+
+```
